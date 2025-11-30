@@ -1,3 +1,5 @@
+# copied from https://github.com/GiacomoPope/dilithium-py
+# added instrumentation of repetitions and abort causes
 import os
 from ..modules.modules import Matrix, Module, Vector
 
@@ -300,7 +302,17 @@ class ML_DSA:
 
         kappa = 0
         alpha = self.gamma_2 << 1
+        self.nr_sign_iterations = 0 
+        self.check_z_fail = 0 #number of aborts due to z
+        self.check_r_fail = 0 #number of aborts due to r
+        self.check_t0_fail = 0 #number of aborts due to t0
+        self.check_h_fail = 0 #number of aborts due to h
+        self.check_r_all_fail = 0 #number of r checks that failed (even those who would have not been reached due to aborts by z)
+        self.check_h_all_fail = 0
+
         while True:
+            self.nr_sign_iterations += 1
+
             y = self._expand_mask_vector(rho_prime, kappa)
             y_hat = y.to_ntt()
             w = (A_hat @ y_hat).from_ntt()
@@ -327,20 +339,36 @@ class ML_DSA:
             # fails the norm bound to reduce any unneeded computations.
             c_s1 = s1_hat.scale(c_hat).from_ntt()
             z = y + c_s1
+
+            abort_it = False
             if z.check_norm_bound(self.gamma_1 - self.beta):
-                continue
+                self.check_z_fail += 1
+                abort_it = True
 
             c_s2 = s2_hat.scale(c_hat).from_ntt()
             r0 = (w - c_s2).low_bits(alpha)
             if r0.check_norm_bound(self.gamma_2 - self.beta):
+                self.check_r_all_fail += 1
+                if not abort_it:
+                    self.check_r_fail += 1
+                    abort_it = True
+
+            if abort_it:
                 continue
 
             c_t0 = t0_hat.scale(c_hat).from_ntt()
             if c_t0.check_norm_bound(self.gamma_2):
-                continue
+                self.check_t0_fail += 1
+                abort_it = True
 
             h = (-c_t0).make_hint(w - c_s2 + c_t0, alpha)
             if h.sum_hint() > self.omega:
+                self.check_h_all_fail += 1
+                if not abort_it:
+                    self.check_h_fail += 1
+                    abort_it = True
+
+            if abort_it:
                 continue
 
             return self._pack_sig(c_tilde, z, h)
