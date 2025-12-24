@@ -26,6 +26,7 @@ class PolynomialRing(PolynomialRingGeneric):
             pow(root_of_unity, self.br(i, 8), 8380417) for i in range(256)
         ]
         self.ntt_f = pow(256, -1, 8380417)
+        self.bytes_cnt = 0
 
     @staticmethod
     def br(i, k):
@@ -43,7 +44,7 @@ class PolynomialRing(PolynomialRingGeneric):
         Create a random 256-element array with τ ±1’s and (256 − τ) 0′s using
         the input seed ρ (and an SHAKE256) to generate the randomness needed
         """
-
+        bytes_cnt = 0
         def rejection_sample(i, xof):
             """
             Sample random bytes from `xof_bytes` and
@@ -51,8 +52,10 @@ class PolynomialRing(PolynomialRingGeneric):
 
             Rejects values until a value j <= i is found
             """
+            nonlocal bytes_cnt
             while True:
                 j = xof.read(1)[0]
+                bytes_cnt += 1
                 if j <= i:
                     return j
 
@@ -74,6 +77,7 @@ class PolynomialRing(PolynomialRingGeneric):
             coeffs[j] = 1 - 2 * (sign_int & 1)
             sign_int >>= 1
 
+        self.bytes_cnt = bytes_cnt
         return self(coeffs)
 
     def rejection_sample_ntt_poly(self, rho, i, j):

@@ -333,6 +333,7 @@ class ML_DSA:
             w1_bytes = w1.bit_pack_w(self.gamma_2)
             c_tilde = self._h(mu + w1_bytes, self.c_tilde_bytes)
             c = self.R.sample_in_ball(c_tilde, self.tau)
+            self.sip_bytes_cnt = self.R.bytes_cnt
             c_hat = c.to_ntt()
 
             # NOTE: unlike FIPS 204 we start again as soon as a vector
